@@ -131,7 +131,7 @@ class ResetPasswordRequestToken(APIView):
                     token = ResetPasswordToken.objects.create(
                         user=user,
                         user_agent=request.META['HTTP_USER_AGENT'],
-                        ip_address=ip
+                        ip_address=ip or '127.0.0.1'
                     )
                 # send a signal that the password token was created
                 # let whoever receives this signal handle sending the email for the password reset
