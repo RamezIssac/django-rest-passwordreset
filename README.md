@@ -2,7 +2,6 @@
 
 [![PyPI version](https://badge.fury.io/py/django-rest-passwordreset.svg)](https://badge.fury.io/py/django-rest-passwordreset)
 [![Build Status](https://travis-ci.org/anx-ckreuzberger/django-rest-passwordreset.svg?branch=master)](https://travis-ci.org/anx-ckreuzberger/django-rest-passwordreset)
-[![Known Vulnerabilities](https://snyk.io/test/github/anx-ckreuzberger/django-rest-passwordreset/badge.svg?targetFile=requirements.txt)](https://snyk.io/test/github/anx-ckreuzberger/django-rest-passwordreset?targetFile=requirements.txt)
 
 This python package provides a simple password reset strategy for django rest framework, where users can request password 
 reset tokens via their registered e-mail address.
@@ -68,7 +67,7 @@ The following settings can be set in Djangos ``settings.py`` file:
  
 ### Signals
 
-* ``reset_password_token_created(reset_password_token)`` Fired when a reset password token is generated
+* ``reset_password_token_created(sender, instance, reset_password_token)`` Fired when a reset password token is generated
 * ``pre_password_reset(user)`` - fired just before a password is being reset
 * ``post_password_reset(user)`` - fired after a password has been reset
 
@@ -85,12 +84,13 @@ from django.urls import reverse
 
 
 @receiver(reset_password_token_created)
-def password_reset_token_created(sender, reset_password_token, *args, **kwargs):
+def password_reset_token_created(sender, instance, reset_password_token, *args, **kwargs):
     """
     Handles password reset tokens
     When a token is created, an e-mail needs to be sent to the user
-    :param sender:
-    :param reset_password_token:
+    :param sender: View Class that sent the signal
+    :param instance: View Instance that sent the signal
+    :param reset_password_token: Token Model Object
     :param args:
     :param kwargs:
     :return:
@@ -124,6 +124,115 @@ def password_reset_token_created(sender, reset_password_token, *args, **kwargs):
 
 3. You should now be able to use the endpoints to request a password reset token via your e-mail address. 
 If you want to test this locally, I recommend using some kind of fake mailserver (such as maildump).
+
+
+## Custom Token Generator
+
+By default, a random string token of length 10 to 50 is generated using the ``RandomStringTokenGenerator`` class.
+This library offers a possibility to configure the params of ``RandomStringTokenGenerator`` as well as switch to
+another token generator, e.g. ``RandomNumberTokenGenerator``. You can also generate your own token generator class.
+
+You can change that by adding 
+```python
+DJANGO_REST_PASSWORDRESET_TOKEN_CONFIG = {
+    "CLASS": ...,
+    "OPTIONS": {...}
+}
+```
+into Django settings.py file.
+
+
+### RandomStringTokenGenerator
+This is the default configuration. 
+```python
+DJANGO_REST_PASSWORDRESET_TOKEN_CONFIG = {
+    "CLASS": "django_rest_passwordreset.tokens.RandomStringTokenGenerator"
+}
+```
+
+You can configure the length as follows:
+```python
+DJANGO_REST_PASSWORDRESET_TOKEN_CONFIG = {
+    "CLASS": "django_rest_passwordreset.tokens.RandomStringTokenGenerator",
+    "OPTIONS": {
+        "min_length": 20,
+        "max_lenght": 30
+    }
+}
+```
+   
+
+### RandomNumberTokenGenerator
+```python
+DJANGO_REST_PASSWORDRESET_TOKEN_CONFIG = {
+    "CLASS": "django_rest_passwordreset.tokens.RandomNumberTokenGenerator"
+}
+```
+
+You can configure the minimum and maximum number as follows:
+```python
+DJANGO_REST_PASSWORDRESET_TOKEN_CONFIG = {
+    "CLASS": "django_rest_passwordreset.tokens.RandomNumberTokenGenerator",
+    "OPTIONS": {
+        "min_number": 1500,
+        "max_number": 9999
+    }
+}
+```
+
+
+### Write your own Token Generator
+
+Please see [token_configuration/django_rest_passwordreset/tokens.py](token_configuration/django_rest_passwordreset/tokens.py) for example implementation of number and string token generator.
+
+The basic idea is to create a new class that inherits from BaseTokenGenerator, takes arbitrary arguments (`args` and `kwargs`)
+in the ``__init__`` function as well as implementing a `generate_token` function.
+
+```python
+from django_rest_passwordreset.tokens import BaseTokenGenerator
+
+
+class RandomStringTokenGenerator(BaseTokenGenerator):
+    """
+    Generates a random string with min and max length using os.urandom and binascii.hexlify
+    """
+
+    def __init__(self, min_length=10, max_length=50, *args, **kwargs):
+        self.min_length = min_length
+        self.max_length = max_length
+
+    def generate_token(self, *args, **kwargs):
+        """ generates a pseudo random code using os.urandom and binascii.hexlify """
+        # determine the length based on min_length and max_length
+        length = random.randint(self.min_length, self.max_length)
+
+        # generate the token using os.urandom and hexlify
+        return binascii.hexlify(
+            os.urandom(self.max_length)
+        ).decode()[0:length]
+```
+
+
+## Compatibility Matrix
+
+This library should be compatible with the latest Django and Django Rest Framework Versions. For reference, here is
+a matrix showing the guaranteed and tested compatibility.
+
+django-rest-passwordreset Version | Django Versions | Django Rest Framework Versions
+--------------------------------- | ----------------| ------------------------------
+0.9.7 | 1.8, 1.11, 2.0, 2.1 | 3.6 - 3.9
+1.0 (WIP) | 1.11, 2.0, 2.2 | 3.6 - 3.9
+
+## Documentation / Browsable API
+
+This package supports the [DRF auto-generated documentation](https://www.django-rest-framework.org/topics/documenting-your-api/) (via `coreapi`) as well as the [DRF browsable API](https://www.django-rest-framework.org/topics/browsable-api/).
+
+![drf_browsable_email_validation](docs/browsable_api_email_validation.png "Browsable API E-Mail Validation")
+
+![drf_browsable_password_validation](docs/browsable_api_password_validation.png "Browsable API E-Mail Validation")
+
+![coreapi_docs](docs/coreapi_docs.png "Core API Docs")
+
 
 ## Known Issues
 
